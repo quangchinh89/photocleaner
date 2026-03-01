@@ -1,0 +1,5 @@
+{
+  "name": "PhotoClean AI",
+  "description": "Identify and clean up duplicate or similar photos using AI recommendations.",
+  "requestFramePermissions": []
+}
