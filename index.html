@@ -1,13 +1,487 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhotoClean AI - Dọn dẹp ảnh trùng lặp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-display { font-family: 'Outfit', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
+        [lucide] { vertical-align: middle; }
+    </style>
+</head>
+<body class="bg-zinc-50 text-zinc-900 min-h-screen">
+    <div id="app" class="max-w-6xl mx-auto p-4 md:p-8">
+        <!-- Header -->
+        <header class="mb-12 flex flex-col md:flex-row md:items-start justify-between gap-6">
+            <div>
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="p-2 bg-emerald-500 rounded-xl text-white">
+                        <i data-lucide="sparkles"></i>
+                    </div>
+                    <h1 id="txt-title" class="text-4xl font-display font-bold tracking-tight">PhotoClean AI</h1>
+                </div>
+                <p id="txt-description" class="text-zinc-500 max-w-md">
+                    Nhận diện và dọn dẹp ảnh trùng lặp thông minh. Hãy để AI quyết định những kỷ niệm nào đáng giữ lại.
+                </p>
+            </div>
 
+            <div class="flex flex-col items-end gap-3">
+                <!-- Language Toggle -->
+                <div class="flex items-center gap-2 p-1 bg-zinc-100 rounded-2xl">
+                    <button onclick="setLanguage('en')" id="btn-lang-en" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all">EN</button>
+                    <button onclick="setLanguage('vi')" id="btn-lang-vi" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-white shadow-sm text-zinc-900">VI</button>
+                </div>
+
+                <!-- Mode Toggle -->
+                <div class="flex items-center gap-2 p-1 bg-zinc-100 rounded-2xl">
+                    <button onclick="setMode('manual')" id="btn-mode-manual" class="flex items-center gap-2 px-4 py-2 rounded-xl transition-all bg-white shadow-sm text-zinc-900">
+                        <i data-lucide="eye" size="18"></i>
+                        <span id="txt-manual-review" class="text-sm font-medium">Xem thủ công</span>
+                    </button>
+                    <button onclick="setMode('auto')" id="btn-mode-auto" class="flex items-center gap-2 px-4 py-2 rounded-xl transition-all text-zinc-500 hover:text-zinc-700">
+                        <i data-lucide="zap" size="18"></i>
+                        <span id="txt-auto-clean" class="text-sm font-medium">Dọn tự động</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main id="main-content" class="space-y-8">
+            <!-- Upload Section -->
+            <section id="upload-section">
+                <label class="block border-2 border-dashed rounded-3xl p-12 transition-all cursor-pointer flex flex-col items-center justify-center gap-4 border-zinc-200 hover:border-zinc-300 bg-white group">
+                    <input type="file" id="file-input" multiple accept="image/*" class="hidden">
+                    <div class="p-4 bg-zinc-50 rounded-full text-zinc-400 group-hover:bg-zinc-100 transition-colors">
+                        <i data-lucide="upload" size="32"></i>
+                    </div>
+                    <div class="text-center">
+                        <p id="txt-drop-photos" class="text-lg font-medium">Chọn ảnh của bạn</p>
+                        <p id="txt-click-to-browse" class="text-zinc-400 text-sm">nhấp để duyệt từ thiết bị của bạn</p>
+                    </div>
+                </label>
+
+                <!-- Preview Grid -->
+                <div id="photo-grid" class="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 hidden"></div>
+
+                <!-- Action Button -->
+                <div id="analyze-container" class="mt-12 flex justify-center hidden">
+                    <button id="btn-analyze" onclick="handleAnalyze()" class="group relative flex items-center gap-3 px-8 py-4 bg-zinc-900 text-white rounded-2xl font-medium hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden">
+                        <i data-lucide="sparkles" size="20"></i>
+                        <span id="txt-find-duplicates">Tìm ảnh trùng lặp</span>
+                        <i data-lucide="arrow-right" size="18" class="group-hover:translate-x-1 transition-transform"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="results-section" class="space-y-12 hidden">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div id="status-icon" class="p-3 rounded-2xl bg-emerald-100 text-emerald-600">
+                            <i data-lucide="check-circle-2" size="24"></i>
+                        </div>
+                        <div>
+                            <h2 id="txt-status-title" class="text-2xl font-display font-bold">Đã tìm thấy ảnh trùng</h2>
+                            <p id="txt-status-desc" class="text-zinc-500">Thư viện ảnh của bạn đã sạch sẽ!</p>
+                        </div>
+                    </div>
+                    <button onclick="resetApp()" class="flex items-center gap-2 px-4 py-2 text-zinc-500 hover:text-zinc-900 transition-colors">
+                        <i data-lucide="refresh-ccw" size="18"></i>
+                        <span id="txt-start-over" class="text-sm font-medium">Bắt đầu lại</span>
+                    </button>
+                </div>
+
+                <div id="groups-container" class="space-y-8"></div>
+            </section>
+        </main>
+
+        <footer class="mt-20 py-8 border-t border-zinc-100 text-center text-zinc-400 text-sm">
+            <p>© 2026 PhotoClean AI • <span id="txt-footer">Cung cấp bởi Gemini 3</span></p>
+        </footer>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-zinc-100">
+            <div class="flex items-center gap-4 mb-6">
+                <div class="p-3 bg-amber-100 text-amber-600 rounded-2xl">
+                    <i data-lucide="alert-circle" size="24"></i>
+                </div>
+                <h3 id="txt-confirm-title" class="text-xl font-bold">Xác nhận dọn dẹp</h3>
+            </div>
+            <p id="txt-confirm-desc" class="text-zinc-600 mb-8">Bạn có chắc chắn muốn xóa các ảnh trùng lặp được đề xuất không?</p>
+            <div class="flex gap-3">
+                <button onclick="closeModal()" id="txt-cancel-action" class="flex-1 px-6 py-3 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-colors">Hủy bỏ</button>
+                <button onclick="executeAutoDelete()" id="txt-confirm-action" class="flex-1 px-6 py-3 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20">Xóa ngay</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "@google/genai": "https://esm.run/@google/genai"
+            }
+        }
+    </script>
+    <script type="module">
+        import { GoogleGenAI, Type } from "@google/genai";
+
+        // --- State ---
+        let language = 'vi';
+        let mode = 'manual';
+        let photos = [];
+        let groups = [];
+        let isAnalyzing = false;
+
+        const translations = {
+            en: {
+                title: 'PhotoClean AI',
+                description: 'Smart duplicate identification and cleanup. Let AI decide which memories are worth keeping.',
+                manualReview: 'Manual Review',
+                autoClean: 'Auto Clean',
+                dropPhotos: 'Select your photos',
+                clickToBrowse: 'click to browse from your device',
+                findDuplicates: 'Find Duplicates',
+                analyzing: 'Analyzing Memories...',
+                duplicatesFound: 'Duplicates Found',
+                noDuplicatesFound: 'No Duplicates Found',
+                identifiedGroups: (count) => `We've identified ${count} groups of similar photos.`,
+                libraryClean: 'Your photo library is clean!',
+                startOver: 'Start Over',
+                group: 'Group',
+                similarPhotos: (count) => `${count} similar photos`,
+                keep: 'keep',
+                delete: 'delete',
+                keepingThis: 'Keeping this one',
+                optimized: 'Library is Optimized',
+                optimizedDesc: "We couldn't find any duplicates in this set of photos. Great job keeping it organized!",
+                footer: 'Powered by Gemini 3',
+                confirmTitle: 'Confirm Cleanup',
+                confirmAutoDelete: (count) => `Are you sure you want to delete the ${count} recommended duplicate photos?`,
+                confirmAction: 'Delete Now',
+                cancelAction: 'Cancel'
+            },
+            vi: {
+                title: 'PhotoClean AI',
+                description: 'Nhận diện và dọn dẹp ảnh trùng lặp thông minh. Hãy để AI quyết định những kỷ niệm nào đáng giữ lại.',
+                manualReview: 'Xem thủ công',
+                autoClean: 'Dọn tự động',
+                dropPhotos: 'Chọn ảnh của bạn',
+                clickToBrowse: 'nhấp để duyệt từ thiết bị của bạn',
+                findDuplicates: 'Tìm ảnh trùng lặp',
+                analyzing: 'Đang phân tích...',
+                duplicatesFound: 'Đã tìm thấy ảnh trùng',
+                noDuplicatesFound: 'Không tìm thấy ảnh trùng',
+                identifiedGroups: (count) => `Chúng tôi đã xác định được ${count} nhóm ảnh tương tự.`,
+                libraryClean: 'Thư viện ảnh của bạn đã sạch sẽ!',
+                startOver: 'Bắt đầu lại',
+                group: 'Nhóm',
+                similarPhotos: (count) => `${count} ảnh tương tự`,
+                keep: 'giữ',
+                delete: 'xóa',
+                keepingThis: 'Đang giữ ảnh này',
+                optimized: 'Thư viện đã tối ưu',
+                optimizedDesc: 'Chúng tôi không tìm thấy bất kỳ ảnh trùng lặp nào trong bộ ảnh này. Tuyệt vời!',
+                footer: 'Cung cấp bởi Gemini 3',
+                confirmTitle: 'Xác nhận dọn dẹp',
+                confirmAutoDelete: (count) => `Bạn có chắc chắn muốn xóa ${count} ảnh trùng lặp được đề xuất không?`,
+                confirmAction: 'Xóa ngay',
+                cancelAction: 'Hủy bỏ'
+            }
+        };
+
+        // --- Core Functions ---
+        window.setLanguage = (lang) => {
+            language = lang;
+            updateUI();
+        };
+
+        window.setMode = (m) => {
+            mode = m;
+            updateUI();
+        };
+
+        window.resetApp = () => {
+            photos = [];
+            groups = [];
+            document.getElementById('file-input').value = '';
+            document.getElementById('upload-section').classList.remove('hidden');
+            document.getElementById('results-section').classList.add('hidden');
+            updateUI();
+        };
+
+        window.closeModal = () => {
+            document.getElementById('confirm-modal').classList.add('hidden');
+        };
+
+        const updateUI = () => {
+            const t = translations[language];
+            document.getElementById('txt-title').innerText = t.title;
+            document.getElementById('txt-description').innerText = t.description;
+            document.getElementById('txt-manual-review').innerText = t.manualReview;
+            document.getElementById('txt-auto-clean').innerText = t.autoClean;
+            document.getElementById('txt-drop-photos').innerText = t.dropPhotos;
+            document.getElementById('txt-click-to-browse').innerText = t.clickToBrowse;
+            document.getElementById('txt-find-duplicates').innerText = isAnalyzing ? t.analyzing : t.findDuplicates;
+            document.getElementById('txt-start-over').innerText = t.startOver;
+            document.getElementById('txt-footer').innerText = t.footer;
+            document.getElementById('txt-confirm-title').innerText = t.confirmTitle;
+            document.getElementById('txt-cancel-action').innerText = t.cancelAction;
+            document.getElementById('txt-confirm-action').innerText = t.confirmAction;
+
+            // Language buttons
+            document.getElementById('btn-lang-en').className = `px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${language === 'en' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500'}`;
+            document.getElementById('btn-lang-vi').className = `px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${language === 'vi' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500'}`;
+
+            // Mode buttons
+            document.getElementById('btn-mode-manual').className = `flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${mode === 'manual' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`;
+            document.getElementById('btn-mode-auto').className = `flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${mode === 'auto' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`;
+
+            renderPhotoGrid();
+            renderGroups();
+            lucide.createIcons();
+        };
+
+        const renderPhotoGrid = () => {
+            const grid = document.getElementById('photo-grid');
+            const container = document.getElementById('analyze-container');
+            if (photos.length > 0) {
+                grid.classList.remove('hidden');
+                grid.innerHTML = photos.map(p => `
+                    <div class="group relative aspect-square rounded-2xl overflow-hidden bg-zinc-100 border border-zinc-200">
+                        <img src="${p.preview}" class="w-full h-full object-cover">
+                        <button onclick="removePhoto('${p.id}')" class="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hover:bg-red-500">
+                            <i data-lucide="x" size="14"></i>
+                        </button>
+                    </div>
+                `).join('');
+                if (photos.length >= 2) container.classList.remove('hidden');
+                else container.classList.add('hidden');
+            } else {
+                grid.classList.add('hidden');
+                container.classList.add('hidden');
+            }
+            lucide.createIcons();
+        };
+
+        window.removePhoto = (id) => {
+            photos = photos.filter(p => p.id !== id);
+            renderPhotoGrid();
+        };
+
+        const renderGroups = () => {
+            const container = document.getElementById('groups-container');
+            const t = translations[language];
+            const duplicateCount = groups.reduce((acc, g) => acc + g.recommendations.filter(r => r.action === 'delete').length, 0);
+
+            if (groups.length > 0) {
+                document.getElementById('txt-status-title').innerText = t.duplicatesFound;
+                document.getElementById('txt-status-desc').innerText = t.identifiedGroups(groups.length);
+                document.getElementById('status-icon').className = "p-3 rounded-2xl bg-amber-100 text-amber-600";
+                document.getElementById('status-icon').innerHTML = '<i data-lucide="alert-circle" size="24"></i>';
+
+                container.innerHTML = groups.map(group => `
+                    <div class="bg-white rounded-3xl p-6 border border-zinc-200 shadow-sm space-y-6">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-zinc-400">${t.group} ${group.groupId.slice(0, 4)}</span>
+                            <div class="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+                                <i data-lucide="image" size="14"></i>
+                                <span class="text-xs font-bold">${t.similarPhotos(group.recommendations.length)}</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            ${group.recommendations.map(rec => {
+                                const photo = photos.find(p => p.id === rec.id);
+                                if (!photo) return '';
+                                return `
+                                    <div class="group relative flex flex-col gap-4">
+                                        <div class="relative aspect-square rounded-2xl overflow-hidden border-4 transition-all ${rec.action === 'keep' ? 'border-emerald-500/50' : 'border-red-500/50 grayscale-[0.5]'}">
+                                            <img src="${photo.preview}" class="w-full h-full object-cover">
+                                            <div class="absolute top-3 left-3 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md ${rec.action === 'keep' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}">
+                                                ${rec.action === 'keep' ? t.keep : t.delete}
+                                            </div>
+                                        </div>
+                                        <div class="px-1">
+                                            <p class="text-sm text-zinc-600 leading-relaxed italic">"${rec.reason}"</p>
+                                            ${mode === 'manual' ? `
+                                                <div class="mt-4 flex gap-2">
+                                                    ${rec.action === 'delete' ? `
+                                                        <button onclick="handleManualAction('${rec.id}', 'delete')" class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors">
+                                                            <i data-lucide="trash-2" size="14"></i> ${t.delete}
+                                                        </button>
+                                                        <button onclick="handleManualAction('${rec.id}', 'keep')" class="px-4 py-2 bg-zinc-50 text-zinc-400 rounded-xl text-xs font-bold hover:bg-zinc-100 hover:text-zinc-600 transition-colors">
+                                                            ${t.keep}
+                                                        </button>
+                                                    ` : `
+                                                        <div class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold">
+                                                            <i data-lucide="check-circle-2" size="14"></i> ${t.keepingThis}
+                                                        </div>
+                                                    `}
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            } else if (groups.length === 0 && document.getElementById('results-section').classList.contains('hidden') === false) {
+                document.getElementById('txt-status-title').innerText = t.optimized;
+                document.getElementById('txt-status-desc').innerText = t.optimizedDesc;
+                document.getElementById('status-icon').className = "p-3 rounded-2xl bg-emerald-100 text-emerald-600";
+                document.getElementById('status-icon').innerHTML = '<i data-lucide="check-circle-2" size="24"></i>';
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-20 text-center">
+                        <div class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6">
+                            <i data-lucide="check-circle-2" size="40"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">${t.optimized}</h3>
+                        <p class="text-zinc-500 max-w-xs">${t.optimizedDesc}</p>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+        };
+
+        window.handleManualAction = (id, action) => {
+            if (action === 'delete') {
+                photos = photos.filter(p => p.id !== id);
+            }
+            groups = groups.map(g => ({
+                ...g,
+                recommendations: g.recommendations.filter(r => r.id !== id)
+            })).filter(g => g.recommendations.length > 0);
+            renderGroups();
+            renderPhotoGrid();
+        };
+
+        // --- File Handling ---
+        document.getElementById('file-input').addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            const newPhotos = await Promise.all(files.map(async (file) => {
+                const base64 = await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(file);
+                });
+                return {
+                    id: Math.random().toString(36).substring(7),
+                    file,
+                    preview: URL.createObjectURL(file),
+                    base64
+                };
+            }));
+            photos = [...photos, ...newPhotos];
+            updateUI();
+        });
+
+        // --- AI Logic ---
+        window.handleAnalyze = async () => {
+            if (photos.length < 2) return;
+            isAnalyzing = true;
+            updateUI();
+
+            try {
+                const apiKey = "process.env.GEMINI_API_KEY"; // AI Studio will inject this
+                const ai = new GoogleGenAI({ apiKey });
+                const model = "gemini-3-flash-preview";
+
+                const imageParts = photos.map(p => ({
+                    inlineData: {
+                        data: p.base64.split(',')[1],
+                        mimeType: p.file.type
+                    }
+                }));
+
+                const languageInstruction = language === "vi" 
+                    ? "Vui lòng cung cấp lý do (reason) bằng tiếng Việt." 
+                    : "Please provide the reasons in English.";
+
+                const prompt = `
+                    Analyze these photos and identify groups of duplicates or very similar images.
+                    For each group, recommend which ONE photo to "keep" and which others to "delete".
+                    Provide a clear reason for each recommendation (e.g., "sharper focus", "better lighting").
+                    ${languageInstruction}
+                    Return the result as a JSON array of groups. Each group should have a 'groupId' and a 'recommendations' array.
+                    Each recommendation must include the 'id' (from the provided IDs) and the 'action' ("keep" or "delete") and 'reason'.
+                `;
+
+                const response = await ai.models.generateContent({
+                    model,
+                    contents: { parts: [...imageParts, { text: prompt }] },
+                    config: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    groupId: { type: Type.STRING },
+                                    recommendations: {
+                                        type: Type.ARRAY,
+                                        items: {
+                                            type: Type.OBJECT,
+                                            properties: {
+                                                id: { type: Type.STRING },
+                                                action: { type: Type.STRING, enum: ["keep", "delete"] },
+                                                reason: { type: Type.STRING }
+                                            },
+                                            required: ["id", "action", "reason"]
+                                        }
+                                    }
+                                },
+                                required: ["groupId", "recommendations"]
+                            }
+                        }
+                    }
+                });
+
+                groups = JSON.parse(response.text || "[]");
+                isAnalyzing = false;
+                document.getElementById('upload-section').classList.add('hidden');
+                document.getElementById('results-section').classList.remove('hidden');
+                
+                if (mode === 'auto') {
+                    const deleteCount = groups.reduce((acc, g) => acc + g.recommendations.filter(r => r.action === 'delete').length, 0);
+                    if (deleteCount > 0) {
+                        document.getElementById('txt-confirm-desc').innerText = translations[language].confirmAutoDelete(deleteCount);
+                        document.getElementById('confirm-modal').classList.remove('hidden');
+                    }
+                }
+                updateUI();
+            } catch (error) {
+                console.error(error);
+                isAnalyzing = false;
+                updateUI();
+                alert("Error analyzing photos. Please try again.");
+            }
+        };
+
+        window.executeAutoDelete = () => {
+            const idsToDelete = groups.flatMap(g => 
+                g.recommendations.filter(r => r.action === 'delete').map(r => r.id)
+            );
+            photos = photos.filter(p => !idsToDelete.includes(p.id));
+            groups = [];
+            closeModal();
+            updateUI();
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        };
+
+        // Initial UI
+        updateUI();
+    </script>
+</body>
+</html>
